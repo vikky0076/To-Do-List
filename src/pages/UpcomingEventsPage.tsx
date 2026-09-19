@@ -508,12 +508,14 @@ function EventCard({ event, onEdit, onDelete, showDate = false }: { event: Upcom
   return (
     <div className="glass-card flex items-center justify-between p-3 gap-3">
       <div className="flex-1 min-w-0">
-        <h4 className="font-medium text-gray-800 text-sm truncate flex items-center gap-2">
-          {event.title}
+        <div className="flex items-center gap-2">
+          <h4 className="font-medium text-gray-800 text-sm truncate">
+            {event.title}
+          </h4>
           {event.repeat && event.repeat !== 'NONE' && (
-             <span title={`Recurs ${event.repeat}`}><Repeat className="w-3 h-3 text-primary-400" /></span>
+             <span title={`Recurs ${event.repeat}`} className="shrink-0"><Repeat className="w-3 h-3 text-primary-400" /></span>
           )}
-        </h4>
+        </div>
         <div className="flex flex-wrap items-center gap-2 mt-1">
           {showDate && event.generated_date && (
             <span className="text-xs font-medium text-primary-600 flex items-center gap-1">

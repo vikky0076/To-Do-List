@@ -20,6 +20,7 @@ type UpcomingEvent = {
   reminder_minutes: number | null;
   repeat: string;
   created_at: string;
+  repeat_days?: number[];
   generated_date?: string; // used for occurrences mapping
 };
 
@@ -41,12 +42,23 @@ export default function UpcomingEventsPage() {
   const [isAdding, setIsAdding] = useState(false);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
 
+  const WEEKDAYS = [
+    { label: 'S', value: 0 },
+    { label: 'M', value: 1 },
+    { label: 'T', value: 2 },
+    { label: 'W', value: 3 },
+    { label: 'T', value: 4 },
+    { label: 'F', value: 5 },
+    { label: 'S', value: 6 },
+  ];
+
   // Add/Edit form state
   const [title, setTitle] = useState('');
   const [eventDate, setEventDate] = useState('');
   const [eventTime, setEventTime] = useState('');
   const [reminder, setReminder] = useState(0);
   const [repeat, setRepeat] = useState('NONE');
+  const [repeatDays, setRepeatDays] = useState<number[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -66,15 +78,27 @@ export default function UpcomingEventsPage() {
           while (occurrenceCount < 365) {
             const evDateTime = new Date(`${format(current, 'yyyy-MM-dd')}T${ev.event_time}`);
             if (evDateTime.getTime() > Date.now()) {
-              scheduleEventReminder(ev.id, ev.title, evDateTime, ev.reminder_minutes);
-              foundNext = true;
-              break;
+              const isMatch = (ev.repeat === 'WEEKLY' && ev.repeat_days && ev.repeat_days.length > 0) 
+                ? ev.repeat_days.includes(current.getDay())
+                : true;
+                
+              if (isMatch) {
+                scheduleEventReminder(ev.id, ev.title, evDateTime, ev.reminder_minutes);
+                foundNext = true;
+                break;
+              }
             }
             if (!ev.repeat || ev.repeat === 'NONE') break;
             
             // Generate next occurrence.
             if (ev.repeat === 'DAILY') current = addDays(current, 1);
-            else if (ev.repeat === 'WEEKLY') current = addWeeks(current, 1);
+            else if (ev.repeat === 'WEEKLY') {
+              if (ev.repeat_days && ev.repeat_days.length > 0) {
+                current = addDays(current, 1);
+              } else {
+                current = addWeeks(current, 1);
+              }
+            }
             else if (ev.repeat === 'MONTHLY') current = addMonths(current, 1);
             else if (ev.repeat === 'YEARLY') current = addYears(current, 1);
             else break;
@@ -120,6 +144,7 @@ export default function UpcomingEventsPage() {
               event_time: meta.event_time,
               reminder_minutes: meta.reminder_minutes,
               repeat: meta.repeat || 'NONE',
+              repeat_days: meta.repeat_days,
               created_at: t.created_at
             });
           } catch(e) {}
@@ -140,6 +165,7 @@ export default function UpcomingEventsPage() {
     setEventTime(ev.event_time || '');
     setReminder(ev.reminder_minutes || 0);
     setRepeat(ev.repeat || 'NONE');
+    setRepeatDays(ev.repeat_days || []);
     setIsAdding(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -151,6 +177,7 @@ export default function UpcomingEventsPage() {
     setEventTime('');
     setReminder(0);
     setRepeat('NONE');
+    setRepeatDays([]);
     setIsAdding(true);
   };
 
@@ -173,7 +200,13 @@ export default function UpcomingEventsPage() {
       const userId = await getUserId();
       if (!userId) return;
 
-      const meta = { type: 'event', event_time: eventTime || null, reminder_minutes: reminder || null, repeat };
+      const meta = { 
+        type: 'event', 
+        event_time: eventTime || null, 
+        reminder_minutes: reminder || null, 
+        repeat,
+        repeat_days: repeat === 'WEEKLY' ? repeatDays : undefined
+      };
 
       if (editingEventId) {
         // Edit flow
@@ -185,6 +218,7 @@ export default function UpcomingEventsPage() {
           event_time: eventTime || null,
           reminder_minutes: reminder || null,
           repeat,
+          repeat_days: repeat === 'WEEKLY' ? repeatDays : undefined,
           created_at: events.find(e => e.id === editingEventId)?.created_at || new Date().toISOString()
         };
         
@@ -210,6 +244,7 @@ export default function UpcomingEventsPage() {
           event_time: eventTime || null,
           reminder_minutes: reminder || null,
           repeat,
+          repeat_days: repeat === 'WEEKLY' ? repeatDays : undefined,
           created_at: new Date().toISOString()
         };
 
@@ -297,11 +332,23 @@ export default function UpcomingEventsPage() {
       
       while (current <= rangeEnd && occurrenceCount < 5000) {
         if (current >= rangeStart) {
-          generatedEvents.push({ ...ev, generated_date: current.toISOString().slice(0, 10) });
+          const isMatch = (ev.repeat === 'WEEKLY' && ev.repeat_days && ev.repeat_days.length > 0)
+            ? ev.repeat_days.includes(current.getDay())
+            : true;
+            
+          if (isMatch) {
+            generatedEvents.push({ ...ev, generated_date: current.toISOString().slice(0, 10) });
+          }
         }
         
         if (ev.repeat === 'DAILY') current = addDays(current, 1);
-        else if (ev.repeat === 'WEEKLY') current = addWeeks(current, 1);
+        else if (ev.repeat === 'WEEKLY') {
+          if (ev.repeat_days && ev.repeat_days.length > 0) {
+            current = addDays(current, 1);
+          } else {
+            current = addWeeks(current, 1);
+          }
+        }
         else if (ev.repeat === 'MONTHLY') current = addMonths(current, 1);
         else if (ev.repeat === 'YEARLY') current = addYears(current, 1);
         else break;
@@ -409,6 +456,36 @@ export default function UpcomingEventsPage() {
                   <option value="MONTHLY">Monthly</option>
                   <option value="YEARLY">Yearly</option>
                 </select>
+                
+                {repeat === 'WEEKLY' && (
+                  <div className="mt-3">
+                    <label className="block text-xs font-medium text-primary-700 mb-1.5">
+                      Select Days
+                    </label>
+                    <div className="flex gap-1.5 flex-wrap">
+                      {WEEKDAYS.map((day) => (
+                        <button
+                          key={day.value}
+                          type="button"
+                          onClick={() => {
+                            setRepeatDays(prev => 
+                              prev.includes(day.value)
+                                ? prev.filter(d => d !== day.value)
+                                : [...prev, day.value].sort()
+                            )
+                          }}
+                          className={`w-7 h-7 rounded-full text-xs font-medium flex items-center justify-center transition-colors ${
+                            repeatDays.includes(day.value)
+                              ? 'bg-primary-500 text-white shadow-sm'
+                              : 'bg-white/50 text-primary-600 hover:bg-primary-100 border border-transparent hover:border-primary-200'
+                          }`}
+                        >
+                          {day.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2 pt-2">

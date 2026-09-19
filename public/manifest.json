@@ -1,0 +1,19 @@
+{
+  "name": "To-Do List",
+  "short_name": "ToDo",
+  "description": "Personal productivity app — tasks, events, notifications, and encrypted vault.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#e8dff5",
+  "theme_color": "#7c3aed",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "sizes": "192x192 512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "utilities"]
+}

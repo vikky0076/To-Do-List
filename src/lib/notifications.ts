@@ -36,6 +36,7 @@ export function sendNotification(title: string, options?: NotificationOptions): 
       reg.showNotification(title, {
         icon: '/favicon.svg',
         badge: '/favicon.svg',
+        // @ts-ignore
         vibrate: [100, 50, 100],
         ...options,
       });

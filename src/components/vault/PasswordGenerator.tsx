@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Copy, RefreshCw } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 
 interface PasswordGeneratorProps {
   onGenerate: (password: string) => void;

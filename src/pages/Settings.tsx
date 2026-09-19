@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { useVault } from '../lib/VaultContext';
 import type { User } from '@supabase/supabase-js';
-import { User as UserIcon, Lock, Bell, Database, Shield, LogOut, Palette } from 'lucide-react';
+import { User as UserIcon, Bell, Database, Shield, LogOut, Palette } from 'lucide-react';
 import { requestNotificationPermission, getPermissionStatus } from '../lib/notifications';
 import { useUser } from '../lib/UserContext';
 

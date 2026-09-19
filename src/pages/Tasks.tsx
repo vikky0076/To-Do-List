@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Plus, CheckCircle2, Circle, Trash2, Calendar, Clock, Filter, AlertCircle, Award, ListTodo } from 'lucide-react';
+import { Plus, CheckCircle2, Circle, Trash2, Calendar, Award, ListTodo } from 'lucide-react';
 import { format, isToday, isPast, isFuture, parseISO } from 'date-fns';
 
 type Task = {
@@ -161,7 +161,6 @@ export default function Tasks() {
     }
 
     // Category filter
-    const today = new Date();
     switch (filter) {
       case 'Today':
         filtered = filtered.filter(t => t.due_date && isToday(parseISO(t.due_date)));

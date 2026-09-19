@@ -9,7 +9,7 @@ type VaultEntry = {
   id: string;
   headline: string;
   content: string;
-  image?: string;
+  image?: string | null;
 };
 
 export default function VaultPasswords() {

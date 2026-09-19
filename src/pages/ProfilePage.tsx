@@ -32,11 +32,23 @@ export default function ProfilePage() {
     setEmail(user.email || '');
     setCreatedAt(user.created_at ? new Date(user.created_at).toLocaleDateString() : '');
 
-    const { data: tasks } = await supabase.from('today_tasks').select('id').eq('user_id', user.id);
-    setTodayCount(tasks?.length || 0);
+    const { data: tasks } = await supabase.from('tasks').select('id, description').eq('user_id', user.id);
+    
+    let tCount = 0;
+    let eCount = 0;
+    
+    if (tasks) {
+      tasks.forEach(t => {
+        if (!t.description || t.description === 'today_task' || t.description.includes('"type":"today"') || t.description.includes('"type":"headline"')) {
+          tCount++;
+        } else if (t.description.includes('"type":"event"')) {
+          eCount++;
+        }
+      });
+    }
 
-    const { data: events } = await supabase.from('upcoming_events').select('id').eq('user_id', user.id);
-    setEventCount(events?.length || 0);
+    setTodayCount(tCount);
+    setEventCount(eCount);
   };
 
   const handleSave = async (e: React.FormEvent) => {

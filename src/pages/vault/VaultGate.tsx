@@ -14,14 +14,20 @@ export default function VaultGate() {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  // WebAuthn support check
   const [webAuthnSupported, setWebAuthnSupported] = useState(false);
+  const [hasBiometric, setHasBiometric] = useState(false);
 
   useEffect(() => {
-    // Check WebAuthn support
-    setWebAuthnSupported(
-      !!(window.PublicKeyCredential && navigator.credentials)
-    );
+    setWebAuthnSupported(!!(window.PublicKeyCredential && navigator.credentials));
+    
+    // Check if user has previously registered biometric for this browser
+    const checkBiometric = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user && localStorage.getItem(`vault_bio_key_${user.id}`) && localStorage.getItem(`vault_bio_id_${user.id}`)) {
+         setHasBiometric(true);
+      }
+    };
+    checkBiometric();
 
     const checkSettings = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -84,32 +90,60 @@ export default function VaultGate() {
     }
   };
 
-  const handleWebAuthn = async () => {
+  const handleWebAuthnUnlock = async () => {
     if (!webAuthnSupported) {
-      setError('WebAuthn/Passkey is not supported on this browser.');
+      setError('Device authentication is not supported on this browser.');
       return;
     }
+    setError('');
     try {
-      // Try to use WebAuthn/Passkey
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+      
+      const storedIdParams = localStorage.getItem(`vault_bio_id_${user.id}`);
+      const storedKeyBase64 = localStorage.getItem(`vault_bio_key_${user.id}`);
+      
+      if (!storedKeyBase64) {
+         setError('Biometric access not configured on this device. Please unlock with PIN first and enable it in Vault Settings.');
+         return;
+      }
+      
+      let allowCredentials = undefined;
+      if (storedIdParams) {
+         try {
+           const idArr = Uint8Array.from(atob(storedIdParams), c => c.charCodeAt(0));
+           allowCredentials = [{ id: idArr, type: 'public-key' }];
+         } catch(e) {}
+      }
+
       const credential = await navigator.credentials.get({
         publicKey: {
           challenge: crypto.getRandomValues(new Uint8Array(32)),
           timeout: 60000,
           rpId: window.location.hostname,
           userVerification: 'required',
+          ...(allowCredentials ? { allowCredentials } : {})
         },
       });
+
       if (credential) {
-        // If we get here, the user authenticated with biometrics
-        // For a full implementation, you'd verify this server-side
-        // For now, we still need the PIN-derived key, so we inform the user
-        setError('Biometric verified. Please enter your Vault PIN to decrypt data.');
+         // Reconstruct the key from LocalStorage
+         const rawKey = Uint8Array.from(atob(storedKeyBase64), c => c.charCodeAt(0));
+         const importedKey = await crypto.subtle.importKey(
+           'raw',
+           rawKey,
+           'AES-GCM',
+           true,
+           ['encrypt', 'decrypt']
+         );
+         unlockVault(importedKey);
+         navigate('/vault/dashboard');
       }
     } catch (err: any) {
       if (err.name === 'NotAllowedError') {
-        setError('Biometric authentication was cancelled.');
+         // cancelled
       } else {
-        setError('Biometric authentication not available: ' + (err.message || 'Unknown error'));
+         setError('Authentication failed. Please use your PIN.');
       }
     }
   };
@@ -139,9 +173,9 @@ export default function VaultGate() {
 
         <div className="p-6">
           {error && (
-            <div className="mb-4 p-3 bg-red-50/80 text-red-600 text-sm rounded-xl border border-red-200">
-              {error}
-            </div>
+             <div className="mb-4 p-3 bg-red-50/80 text-red-600 text-sm rounded-xl border border-red-200">
+               {error}
+             </div>
           )}
 
           {isSettingUp ? (
@@ -181,33 +215,46 @@ export default function VaultGate() {
               </button>
             </form>
           ) : (
-            <form onSubmit={handleUnlock} className="space-y-3">
-              <div>
-                <label className="block text-xs font-medium text-primary-700 mb-1">Vault PIN</label>
-                <input
-                  type="password"
-                  required
-                  value={pin}
-                  onChange={e => setPin(e.target.value)}
-                  autoComplete="current-password"
-                  className="glass-input text-center tracking-widest text-lg py-3"
-                  placeholder="••••••"
-                />
-              </div>
-              <button type="submit" disabled={loading} className="w-full glass-btn justify-center py-2.5">
-                <Unlock className="w-5 h-5" /> Unlock Vault
-              </button>
+            <div className="space-y-4">
+              <form onSubmit={handleUnlock} className="space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-primary-700 mb-1">Vault PIN</label>
+                  <input
+                    type="password"
+                    required
+                    value={pin}
+                    onChange={e => setPin(e.target.value)}
+                    autoComplete="current-password"
+                    className="glass-input text-center tracking-widest text-lg py-3"
+                    placeholder="••••••"
+                  />
+                </div>
+                <button type="submit" disabled={loading} className="w-full glass-btn justify-center py-2.5">
+                  <Unlock className="w-5 h-5" /> Unlock Vault
+                </button>
+              </form>
 
               {webAuthnSupported && (
-                <button
-                  type="button"
-                  onClick={handleWebAuthn}
-                  className="w-full glass-btn-secondary justify-center py-2.5 mt-2"
-                >
-                  <Fingerprint className="w-5 h-5" /> Use Biometric Unlock
-                </button>
+                <>
+                  <div className="relative flex py-2 items-center">
+                    <div className="flex-grow border-t border-primary-200/50"></div>
+                    <span className="flex-shrink-0 mx-4 text-primary-400 text-xs font-medium">OR</span>
+                    <div className="flex-grow border-t border-primary-200/50"></div>
+                  </div>
+                  
+                  <button
+                    type="button"
+                    onClick={handleWebAuthnUnlock}
+                    className="w-full glass-btn-secondary justify-center py-2.5 bg-white/60 hover:bg-white"
+                  >
+                    <Fingerprint className="w-5 h-5" /> Use Device Biometric / Passkey
+                  </button>
+                  <p className="text-center text-[0.65rem] text-primary-500 mt-1">
+                    Use your device's biometric, face ID, or screen-lock authentication.
+                  </p>
+                </>
               )}
-            </form>
+            </div>
           )}
         </div>
       </div>

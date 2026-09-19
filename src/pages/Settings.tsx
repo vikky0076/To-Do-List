@@ -307,10 +307,9 @@ export default function Settings() {
                   onClick={async () => {
                     const userId = user?.id;
                     if (!userId) return;
-                    const { data: tasks } = await supabase.from('today_tasks').select('*').eq('user_id', userId);
-                    const { data: events } = await supabase.from('upcoming_events').select('*').eq('user_id', userId);
-                    const { data: headlines } = await supabase.from('today_list_headlines').select('*').eq('user_id', userId);
-                    const exportData = { tasks, events, headlines, exportedAt: new Date().toISOString() };
+                    const { data: tasks } = await supabase.from('tasks').select('*').eq('user_id', userId);
+                    const { data: vaultItems } = await supabase.from('vault_items').select('*').eq('user_id', userId);
+                    const exportData = { tasks, vaultItems, exportedAt: new Date().toISOString() };
                     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');

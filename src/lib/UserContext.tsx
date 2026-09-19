@@ -82,8 +82,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     try {
       const { error } = await supabase
         .from('profiles')
-        .update({ display_name: trimmedName })
-        .eq('id', user.id);
+        .upsert({ id: user.id, display_name: trimmedName }, { onConflict: 'id' });
 
       if (error) {
         return { success: false, error: 'Unable to update profile. Please try again.' };

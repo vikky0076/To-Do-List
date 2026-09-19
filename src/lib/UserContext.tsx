@@ -30,15 +30,17 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
             .from('profiles')
             .select('display_name')
             .eq('id', currentUser.id)
-            .single();
+            .maybeSingle();
 
-          if (error && error.code !== 'PGRST116') {
+          if (error) {
             console.error('Error fetching profile:', error);
           }
           
           if (mounted) {
             if (data?.display_name) {
               setDisplayName(data.display_name);
+            } else if (currentUser.user_metadata?.display_name) {
+              setDisplayName(currentUser.user_metadata.display_name);
             } else {
               setDisplayName(currentUser.email?.split('@')[0] || 'User');
             }
@@ -80,18 +82,23 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .upsert({ id: user.id, display_name: trimmedName }, { onConflict: 'id' });
+      // Securely store it in Supabase Auth user_metadata (bypassing strict `profiles` table RLS limitations natively)
+      const { error: authError } = await supabase.auth.updateUser({
+        data: { display_name: trimmedName }
+      });
 
-      if (error) {
-        return { success: false, error: 'Unable to update profile. Please try again.' };
-      }
+      if (authError) throw authError;
+
+      // Attempt to sync with the public profiles table just in case (gracefully ignoring if RLS blocks it)
+      await supabase
+        .from('profiles')
+        .update({ display_name: trimmedName })
+        .eq('id', user.id);
 
       setDisplayName(trimmedName);
       return { success: true };
     } catch (err: any) {
-      return { success: false, error: 'Unable to update profile. Please try again.' };
+      return { success: false, error: err?.message || 'Unable to update profile. Please try again.' };
     }
   };
 

@@ -468,8 +468,8 @@ export default function TodayPage() {
                     </div>
                   ) : (
                     <>
-                      <div className="flex-1 min-w-0">
-                        <span className={`text-sm font-medium block truncate ${task.completed ? 'task-completed' : 'text-gray-800'}`}>
+                      <div className="flex-1 min-w-0 pt-0.5">
+                        <span className={`font-handwriting text-[1.1rem] leading-none block truncate ${task.completed ? 'task-completed' : 'text-gray-800'}`}>
                           {task.title}
                         </span>
                         <div className="flex flex-wrap items-center gap-2 mt-1.5">
@@ -591,7 +591,7 @@ export default function TodayPage() {
                                 onChange={() => toggleHeadlineItem(headline.id, item.id)}
                                 className="task-checkbox"
                               />
-                              <span className={`flex-1 text-sm ${item.completed ? 'task-completed' : 'text-gray-700'}`}>
+                              <span className={`flex-1 font-handwriting text-[1.1rem] pt-1 leading-none ${item.completed ? 'task-completed' : 'text-gray-700'}`}>
                                 {item.title}
                               </span>
                               <button

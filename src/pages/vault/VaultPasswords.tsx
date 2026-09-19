@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useVault } from '../../lib/VaultContext';
 import { encryptData, decryptData } from '../../lib/crypto';
-import { Plus, Trash2, Eye, EyeOff, ArrowLeft, Lock } from 'lucide-react';
+import { Plus, Trash2, Eye, EyeOff, ArrowLeft, Lock, X, Image as ImageIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 type VaultEntry = {
   id: string;
   headline: string;
   content: string;
+  image?: string;
 };
 
 export default function VaultPasswords() {
@@ -20,6 +21,7 @@ export default function VaultPasswords() {
   // Simple form: Headline + Content
   const [headline, setHeadline] = useState('');
   const [content, setContent] = useState('');
+  const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Visibility
@@ -35,17 +37,22 @@ export default function VaultPasswords() {
       setLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
       const { data, error } = await supabase
-        .from('vault_items')
+        .from('tasks')
         .select('*')
         .eq('user_id', user?.id)
+        .eq('priority', 'Vault')
         .order('created_at', { ascending: false });
       if (error) throw error;
 
       const decrypted: VaultEntry[] = [];
       for (const item of data || []) {
         try {
-          const d = await decryptData(vaultKey, item.encrypted_data);
-          decrypted.push({ id: item.id, headline: d.headline || d.title || 'Untitled', content: d.content || d.password || '' });
+          let encData = item.description;
+          if (encData && encData.startsWith('{')) {
+            encData = JSON.parse(encData).encrypted;
+          }
+          const d = await decryptData(vaultKey, encData);
+          decrypted.push({ id: item.id, headline: d.headline || d.title || 'Untitled', content: d.content || d.password || '', image: d.image });
         } catch {
           // Decryption failed, skip
         }
@@ -66,14 +73,16 @@ export default function VaultPasswords() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const itemData = { headline: headline.trim(), content: content };
+      const itemData = { headline: headline.trim(), content: content, image: imageBase64 };
       const encrypted = await encryptData(vaultKey, itemData);
 
-      const { data, error } = await supabase.from('vault_items').insert({
+      const { data, error } = await supabase.from('tasks').insert({
         user_id: user.id,
-        type: 'secret',
-        category: 'Personal',
-        encrypted_data: encrypted,
+        title: 'Vault Secret',
+        priority: 'Vault',
+        completed: false,
+        points: 0,
+        description: JSON.stringify({ type: 'vault_secret', encrypted: encrypted }),
       }).select().single();
 
       if (error) throw error;
@@ -81,6 +90,7 @@ export default function VaultPasswords() {
       setIsAdding(false);
       setHeadline('');
       setContent('');
+      setImageBase64(null);
     } catch (e) {
       console.error(e);
     } finally {
@@ -92,7 +102,7 @@ export default function VaultPasswords() {
     if (!window.confirm('Delete this entry permanently?')) return;
     setEntries(entries.filter(e => e.id !== id));
     try {
-      await supabase.from('vault_items').delete().eq('id', id);
+      await supabase.from('tasks').delete().eq('id', id);
     } catch (e) {
       console.error(e);
     }
@@ -137,13 +147,36 @@ export default function VaultPasswords() {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-primary-700 mb-1">Content</label>
+              <label className="block text-xs font-medium text-primary-700 mb-1">Content (Optional)</label>
               <textarea
                 value={content}
                 onChange={e => setContent(e.target.value)}
                 className="glass-input min-h-[80px]"
-                placeholder="Your secret content…"
+                placeholder="Your secret text content…"
               />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-primary-700 mb-1">Image (Optional)</label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = (ev) => {
+                    if (ev.target?.result) setImageBase64(ev.target.result as string);
+                  };
+                  reader.readAsDataURL(file);
+                }}
+                className="glass-input file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100"
+              />
+              {imageBase64 && (
+                <div className="mt-2 relative inline-block">
+                  <img src={imageBase64} alt="Preview" className="h-24 rounded-lg border border-primary-200 object-cover" />
+                  <button type="button" onClick={() => setImageBase64(null)} className="absolute -top-2 -right-2 bg-red-100 text-red-600 rounded-full p-1 shadow-sm hover:bg-red-200"><X className="w-3 h-3" /></button>
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-2 pt-1">
               <button type="submit" disabled={isSubmitting} className="glass-btn px-5 py-2 text-sm">
@@ -174,9 +207,19 @@ export default function VaultPasswords() {
               </div>
               <div className="flex-1 min-w-0">
                 <h3 className="font-semibold text-gray-800 text-sm">{entry.headline}</h3>
-                <p className="text-xs text-gray-500 font-mono mt-1 truncate">
-                  {visibleContent[entry.id] ? entry.content : '••••••••••••'}
-                </p>
+                {entry.content && (
+                  <p className="text-xs text-gray-500 font-mono mt-1 break-all whitespace-pre-wrap">
+                    {visibleContent[entry.id] ? entry.content : '••••••••••••'}
+                  </p>
+                )}
+                {entry.image && visibleContent[entry.id] && (
+                  <img src={entry.image} alt={entry.headline} className="mt-3 max-h-48 rounded-lg border border-primary-200 object-contain bg-white/50" />
+                )}
+                {entry.image && !visibleContent[entry.id] && (
+                  <p className="text-xs text-primary-400 font-medium mt-1 flex items-center gap-1">
+                    <ImageIcon className="w-3 h-3" /> [Image Hidden]
+                  </p>
+                )}
               </div>
               <div className="flex items-center gap-1 shrink-0">
                 <button

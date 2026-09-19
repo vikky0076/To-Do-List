@@ -119,14 +119,14 @@ export default function Tasks() {
         });
 
         // Update total points in profile using a direct RPC if possible, but for now just let the client do it or trigger
-        const { data: profile } = await supabase.from('profiles').select('total_points').eq('id', user.id).single();
+        const { data: profile } = await supabase.from('profiles').select('total_points').eq('id', user.id).maybeSingle();
         if (profile) {
           await supabase.from('profiles').update({ total_points: profile.total_points + task.points }).eq('id', user.id);
         }
       } else {
         // Remove points (if uncompleted) - simple implementation
         await supabase.from('points_transactions').delete().eq('task_id', task.id);
-        const { data: profile } = await supabase.from('profiles').select('total_points').eq('id', user.id).single();
+        const { data: profile } = await supabase.from('profiles').select('total_points').eq('id', user.id).maybeSingle();
         if (profile) {
           await supabase.from('profiles').update({ total_points: Math.max(0, profile.total_points - task.points) }).eq('id', user.id);
         }

@@ -508,8 +508,8 @@ function EventCard({ event, onEdit, onDelete, showDate = false }: { event: Upcom
   return (
     <div className="glass-card flex items-center justify-between p-3 gap-3">
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <h4 className="font-medium text-gray-800 text-sm truncate">
+        <div className="flex items-center gap-2 pt-0.5">
+          <h4 className="font-handwriting text-[1.15rem] leading-none text-gray-800 truncate">
             {event.title}
           </h4>
           {event.repeat && event.repeat !== 'NONE' && (

@@ -77,7 +77,7 @@ export default function NotificationsPage() {
         .from('notification_preferences')
         .select('*')
         .eq('user_id', userId)
-        .single();
+        .maybeSingle();
       if (data) {
         setPrefs(prev => ({ ...prev, ...data }));
       }

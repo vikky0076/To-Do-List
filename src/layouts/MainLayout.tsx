@@ -75,7 +75,7 @@ export default function MainLayout() {
         ))}
       </div>
 
-      <div className="p-3 border-t border-white/30">
+      <div className="p-3 border-t border-white/30 flex flex-col gap-2">
         <button
           onClick={handleSignOut}
           className="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-500 hover:bg-red-50 hover:text-red-600 transition-all w-full"
@@ -83,6 +83,14 @@ export default function MainLayout() {
           <LogOut className="w-[1.15rem] h-[1.15rem]" />
           <span>Sign Out</span>
         </button>
+        <div className="text-center mt-2 pb-1">
+          <p className="text-[0.65rem] text-gray-400 font-medium tracking-wide">
+            © 2026 All rights reserved
+          </p>
+          <p className="text-[0.6rem] text-primary-500/80 font-semibold uppercase mt-0.5 tracking-wider">
+            Developed by VIGNESH
+          </p>
+        </div>
       </div>
     </div>
   );
@@ -98,7 +106,7 @@ export default function MainLayout() {
       {isMobileMenuOpen && (
         <div className="md:hidden fixed inset-0 z-50 flex animate-fade-in">
           <div className="fixed inset-0 bg-purple-950/40 backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)} />
-          <div className="relative w-72 h-full glass-card-solid flex flex-col animate-fade-in-up" style={{ borderRadius: 0 }}>
+          <div className="relative w-72 h-full bg-white shadow-2xl flex flex-col animate-fade-in-up" style={{ borderRadius: 0 }}>
             <button
               onClick={() => setIsMobileMenuOpen(false)}
               className="absolute top-4 right-4 p-2 text-gray-500 hover:bg-white/60 rounded-lg transition-colors"

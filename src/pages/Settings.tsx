@@ -3,7 +3,9 @@ import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { useVault } from '../lib/VaultContext';
 import type { User } from '@supabase/supabase-js';
-import { User as UserIcon, Bell, Database, Shield, LogOut, Palette } from 'lucide-react';
+import { User as UserIcon, Bell, Database, Shield, LogOut, Palette, FileText, Table } from 'lucide-react';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { requestNotificationPermission, getPermissionStatus } from '../lib/notifications';
 import { useUser } from '../lib/UserContext';
 
@@ -35,6 +37,8 @@ export default function Settings() {
     default_reminder_minutes: 30,
   });
 
+  const [showExportModal, setShowExportModal] = useState(false);
+
   useEffect(() => {
     loadSettings();
   }, [globalName]);
@@ -50,7 +54,7 @@ export default function Settings() {
         .from('notification_preferences')
         .select('*')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
       if (prefData) setPrefs(prev => ({ ...prev, ...prefData }));
     }
     setLoading(false);
@@ -119,6 +123,58 @@ export default function Settings() {
     lockVault();
     await supabase.auth.signOut();
     navigate('/');
+  };
+
+  const exportData = async (format: 'csv' | 'pdf') => {
+    const userId = user?.id;
+    if (!userId) return;
+    try {
+      const { data: allTasks } = await supabase.from('tasks').select('*').eq('user_id', userId);
+      const tasks = (allTasks || []).filter(t => t.priority !== 'Vault');
+      const vaultItems = (allTasks || []).filter(t => t.priority === 'Vault');
+
+      if (format === 'csv') {
+          let csvContent = 'Type,Title,Status,Priority,Due Date,Points,Date Added\n';
+          tasks.forEach(t => {
+              const title = (t.title || '').replace(/"/g, '""');
+              let type = 'Task';
+              if (t.description?.includes('"type":"event"')) type = 'Event';
+              else if (t.description?.includes('"type":"headline"')) type = 'List';
+              const status = t.completed ? 'Completed' : 'Pending';
+              csvContent += `"${type}","${title}","${status}","${t.priority || 'Medium'}","${t.due_date?.slice(0, 10) || ''}","${t.points || 0}","${t.created_at?.slice(0, 10) || ''}"\n`;
+          });
+          vaultItems.forEach(t => {
+              csvContent += `"Vault Secret","[Encrypted Content]","Locked","Vault","","0","${t.created_at?.slice(0, 10) || ''}"\n`;
+          });
+          const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `todolist-export-${new Date().toISOString().slice(0,10)}.csv`;
+          a.click();
+          URL.revokeObjectURL(url);
+          showMessage('Data exported successfully as CSV.', 'success');
+      } else if (format === 'pdf') {
+          const doc = new jsPDF();
+          doc.text("To-Do List & Vault Export", 14, 15);
+          const tableData: any[][] = [];
+          tasks.forEach(t => {
+              let type = 'Task';
+              if (t.description?.includes('"type":"event"')) type = 'Event';
+              else if (t.description?.includes('"type":"headline"')) type = 'List';
+              tableData.push([type, t.title || '', t.completed ? 'Completed' : 'Pending', t.priority || 'Medium', t.due_date?.slice(0, 10) || '']);
+          });
+          vaultItems.forEach(_ => {
+              tableData.push(["Vault Secret", "[Encrypted Content]", "Locked", "Vault", ""]);
+          });
+          autoTable(doc, { head: [['Type', 'Title', 'Status', 'Priority', 'Due Date']], body: tableData, startY: 20 });
+          doc.save(`todolist-export-${new Date().toISOString().slice(0,10)}.pdf`);
+          showMessage('Data exported successfully as PDF.', 'success');
+      }
+    } catch (e) {
+      console.error(e);
+      showMessage('Export failed.', 'error');
+    }
   };
 
   if (loading) return <div className="p-8 text-center text-primary-400">Loading settings…</div>;
@@ -304,21 +360,7 @@ export default function Settings() {
                 <h3 className="font-semibold text-primary-800 mb-2">Export Data</h3>
                 <p className="text-xs text-primary-500 mb-3">Download a copy of your tasks, events, and settings.</p>
                 <button
-                  onClick={async () => {
-                    const userId = user?.id;
-                    if (!userId) return;
-                    const { data: tasks } = await supabase.from('tasks').select('*').eq('user_id', userId);
-                    const { data: vaultItems } = await supabase.from('vault_items').select('*').eq('user_id', userId);
-                    const exportData = { tasks, vaultItems, exportedAt: new Date().toISOString() };
-                    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `todolist-export-${new Date().toISOString().slice(0,10)}.json`;
-                    a.click();
-                    URL.revokeObjectURL(url);
-                    showMessage('Data exported successfully.', 'success');
-                  }}
+                  onClick={() => setShowExportModal(true)}
                   className="glass-btn-secondary px-4 py-2 text-sm"
                 >
                   Export My Data
@@ -342,6 +384,39 @@ export default function Settings() {
           )}
         </div>
       </div>
+
+      {/* Export Format Modal */}
+      {showExportModal && (
+        <div className="modal-overlay z-50">
+          <div className="modal-content animate-scale-in text-center p-6 border border-white/40">
+            <h3 className="text-xl font-bold text-primary-900 mb-2">Export Format</h3>
+            <p className="text-sm text-primary-600 mb-6 leading-relaxed">
+              Choose your preferred export format. We recommend PDF for printing or CSV for spreadsheet applications.
+            </p>
+            <div className="space-y-3">
+              <button 
+                onClick={() => { setShowExportModal(false); exportData('pdf'); }} 
+                className="w-full glass-btn justify-center py-2.5 flex items-center gap-2"
+              >
+                <FileText className="w-4 h-4" /> Download as PDF
+              </button>
+              <button 
+                onClick={() => { setShowExportModal(false); exportData('csv'); }} 
+                className="w-full glass-btn-secondary justify-center py-2.5 flex items-center gap-2"
+              >
+                <Table className="w-4 h-4" /> Download as CSV
+              </button>
+              <button 
+                onClick={() => setShowExportModal(false)} 
+                className="w-full text-center text-sm font-medium text-gray-500 py-2 hover:text-gray-700 mt-1 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

@@ -15,7 +15,6 @@ export default function VaultGate() {
   const navigate = useNavigate();
 
   const [webAuthnSupported, setWebAuthnSupported] = useState(false);
-  const [hasBiometric, setHasBiometric] = useState(false);
 
   useEffect(() => {
     setWebAuthnSupported(!!(window.PublicKeyCredential && navigator.credentials));
@@ -24,7 +23,7 @@ export default function VaultGate() {
     const checkBiometric = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user && localStorage.getItem(`vault_bio_key_${user.id}`) && localStorage.getItem(`vault_bio_id_${user.id}`)) {
-         setHasBiometric(true);
+         // Biometric is available
       }
     };
     checkBiometric();
@@ -36,7 +35,7 @@ export default function VaultGate() {
         .from('vault_settings')
         .select('*')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
       if (data) {
         // Has settings, show unlock
       } else {
@@ -108,11 +107,11 @@ export default function VaultGate() {
          return;
       }
       
-      let allowCredentials = undefined;
+      let allowCredentials: PublicKeyCredentialDescriptor[] | undefined = undefined;
       if (storedIdParams) {
          try {
            const idArr = Uint8Array.from(atob(storedIdParams), c => c.charCodeAt(0));
-           allowCredentials = [{ id: idArr, type: 'public-key' }];
+           allowCredentials = [{ id: idArr, type: 'public-key' as const }];
          } catch(e) {}
       }
 

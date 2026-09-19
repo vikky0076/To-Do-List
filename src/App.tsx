@@ -11,7 +11,7 @@ import VaultGate from './pages/vault/VaultGate';
 import VaultDashboard from './pages/vault/VaultDashboard';
 import VaultPasswords from './pages/vault/VaultPasswords';
 import Settings from './pages/Settings';
-import { supabase } from './lib/supabase';
+import { supabase, isSupabaseConfigured } from './lib/supabase';
 import type { User } from '@supabase/supabase-js';
 import { VaultProvider } from './lib/VaultContext';
 import { UserProvider } from './lib/UserContext';
@@ -59,6 +59,33 @@ function App() {
   }, []);
 
   if (loading) return <SplashScreen />;
+  
+  if (!isSupabaseConfigured) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
+        <div className="bg-white border-2 border-red-500 rounded-xl p-8 max-w-2xl w-full shadow-2xl space-y-6">
+          <div className="flex items-center space-x-4">
+            <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center text-red-600 text-2xl font-bold">!</div>
+            <h1 className="text-2xl font-bold text-gray-900">Missing Vercel Environment Variables</h1>
+          </div>
+          <div className="space-y-4 text-gray-700">
+            <p>Your deployed application could not connect to Supabase because the Environment Variables are missing or incorrectly named inside Vercel.</p>
+            <div className="bg-gray-100 p-4 rounded-lg font-mono text-sm space-y-2">
+              <p><span className="font-bold text-red-600">Ensure EXACT Spelling in Vercel:</span></p>
+              <p>Key 1: <strong>VITE_SUPABASE_URL</strong></p>
+              <p>Key 2: <strong>VITE_SUPABASE_ANON_KEY</strong></p>
+            </div>
+            <ul className="list-disc pl-5 space-y-2 text-sm">
+              <li>Open your Vercel Dashboard Settings -&gt; Environment Variables.</li>
+              <li>Make sure the prefix <span className="font-semibold bg-yellow-100">VITE_</span> is included in the name! (If it says SUPABASE_URL, it will fail).</li>
+              <li>Ensure the boxes for <span className="font-semibold">Production</span>, <span className="font-semibold">Preview</span>, and <span className="font-semibold">Development</span> environments are all checked.</li>
+              <li><strong>Crucial:</strong> After making these changes, you <span className="underline font-bold">must Redeemer/Rebuild the app</span> in Vercel.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <BrowserRouter>
